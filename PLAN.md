@@ -17,7 +17,7 @@
 > ### 🎯 PHASE 0 — Foundation
 > **Owner:** Claude Code (backend) + Codex (frontend) in parallel
 > **Target:** Weeks 1–2
-> **Status:** NOT STARTED
+> **Status:** IN PROGRESS — approaching sign-off (deployment + DB done; auth/tenancy logic + CI wiring remain)
 
 ---
 
@@ -42,8 +42,8 @@
 ### 0.2 Database Schema & RLS
 **Owner: Claude Code**
 
-- [!] Create Supabase project in region `ap-southeast-2` (AWS Sydney) — **needs human action: create project at supabase.com**
-- [!] Enable pgvector extension in Supabase — **needs human action: enable in Supabase dashboard after project created**
+- [x] Supabase project created — ap-southeast-2 (Sydney), ref btcmfroekrmiffuozudvh
+- [x] pgvector extension enabled in Supabase
 - [x] Write migration: `organisations` table (`supabase/migrations/20260524120000_create_organisations.sql`)
 - [x] Write migration: `users` table (`supabase/migrations/20260524120001_create_users.sql`)
 - [x] Write migration: `org_memberships` table (`supabase/migrations/20260524120002_create_org_memberships.sql`)
@@ -57,7 +57,7 @@
 - [x] Add indexes on every foreign key column
 - [x] Drizzle ORM schema in `packages/db` matches migrations exactly
 - [x] Write seed script: one tradie test org (owner + apprentice, 2 NZ licences, 3 jobs) (`supabase/seed.sql`)
-- [!] Run seed against local Supabase and verify all rows exist — **blocked on Supabase project creation**
+- [x] Seed applied — Kiwi Spark Electrical test org verified
 
 **Acceptance:** Connect to Supabase as User A (org A). Attempt to query org B's data via direct DB call. Returns zero rows. `audit_log` rejects an `UPDATE` statement even from the service role.
 
@@ -66,7 +66,7 @@
 ### 0.3 Authentication
 **Owner: Codex**
 
-- [ ] Supabase Auth configured: email/password, magic link, Google OAuth
+- [ ] Supabase Auth configured: email/password, magic link, Google OAuth — **verify all three providers are enabled in the Supabase dashboard before ticking**
 - [x] Sign up page (`/signup`) — email + password
 - [x] Sign in page (`/login`) — email + password + magic link option
 - [x] Google OAuth button wired to Supabase Auth
@@ -84,7 +84,7 @@
 
 - [x] tRPC v11 initialised with type-safe context
 - [ ] Context includes: `auth.uid()`, resolved `org_id`, Drizzle DB client
-- [ ] `requireOrgMember(orgId)` helper implemented — throws if user is not a member of the org
+- [~] `requireOrgMember(orgId)` helper implemented — stub exists, hardcoded OWNER; real DB membership check is the next task
 - [x] `protectedProcedure` base procedure that enforces auth
 - [ ] Organisation creation procedure: `org.create`
 - [ ] Organisation invite procedure: `org.invite` — sends email via Resend, creates pending membership
@@ -106,10 +106,10 @@
   - Documents
   - Operations (Invoices, Quotes, Expenses)
   - Settings
-- [ ] Header: org name, user avatar, sign out
+- [x] Header: org name, user avatar, sign out
 - [x] Empty state for every stub page (not a blank white screen — a meaningful empty state with a short description of what will be here)
 - [x] `/compliance/licences` page stub: shows empty licence list with "No licences added yet" state
-- [ ] Responsive: works at 375px (mobile) and 1280px (desktop)
+- [x] Responsive: works at 375px (mobile) and 1280px (desktop)
 - [x] Dark mode support via Tailwind (shadcn default)
 
 **Acceptance:** Every nav item navigates without a 404. Every page has a visible empty state. Looks correct on iPhone SE screen width (375px).
@@ -120,15 +120,15 @@
 **Owner: Claude Code**
 
 - [x] FastAPI app in `apps/ai-service/` (`api.py`, `config.py`)
-- [x] `GET /health` returns `{"status": "ok", "version": "0.1.0", "service": "atlas-ai"}`
+- [x] `GET /health` returns `{"status": "healthy", "version": "1.0.0", "timestamp": "<iso8601>"}`
 - [x] HMAC request verification middleware — `require_valid_signature` FastAPI dependency; unsigned requests return 401
 - [x] LangGraph installed and a stub graph compiles without error (`agents/stub.py` — imported at startup)
 - [x] Rules engine skeleton: `apps/ai-service/rules/engine.py` — empty rule registry, evaluation interface defined per `COMPLIANCE.md` §4, smoke tests in `tests/test_engine.py`
 - [x] `pyproject.toml` with pinned versions (switched from `requirements.txt` per CONVENTIONS §8 — uv)
-- [x] `Dockerfile` for Railway deployment
-- [!] Deployed to Railway — public URL accessible — **needs human action: `railway up` from `apps/ai-service/`**
+- [x] `Dockerfile` for Render deployment (binds uvicorn to $PORT)
+- [x] Deployed to Render — Singapore region, healthy — https://atlas-ai-service.onrender.com (Railway abandoned after repeated builder-infra failures)
 
-**Acceptance:** `curl https://your-railway-url/health` returns 200 with correct JSON. A signed request from `apps/web` reaches the AI service and passes HMAC verification. An unsigned request returns 401.
+**Acceptance:** `curl https://atlas-ai-service.onrender.com/health` returns 200 ✅ (verified 2026-06-26). HMAC round-trip from `apps/web` NOT YET TESTABLE — no frontend code calls the AI service yet (shared-secret env var is `AI_SERVICE_SHARED_SECRET`, not `HMAC_SHARED_SECRET`). Verify the signed-request / unsigned-401 behaviour when Codex builds the calling code.
 
 ---
 
@@ -173,7 +173,7 @@ Before moving to Phase 1, the human owner verifies:
 - [ ] Tenant isolation test: two separate browser sessions, two orgs — zero data leakage
 - [ ] CI passes on a fresh PR with no code changes
 - [ ] Vercel deploy is live and accessible
-- [ ] Railway AI service health check returns 200
+- [x] Render AI service health check returns 200 (https://atlas-ai-service.onrender.com/health, 2026-06-26)
 - [ ] Sentry receives a test error
 - [ ] No secrets in the git history (`git log --all --full-diff -p | grep "sk-ant-"` returns nothing)
 
@@ -341,6 +341,9 @@ Phases 2 and 3 run in parallel intentionally — independent workstreams.
 | 2026-05 | NZ before AU | Human | Founder's market, simpler (no Modern Awards), faster to validate |
 | 2026-05 | Monolith-first (2 services max) | Claude Code | Speed to ship; extract only with evidence of bottleneck |
 | 2026-05 | Claude Code = AI/compliance/security; Codex = frontend/CRUD | Human + Claude | Plays to each agent's strengths |
+| 2026-06-26 | Abandoned Railway, migrated AI service to Render (Singapore) | Claude Code + Human | 6 Railway deploys failed on builder-infra snapshot errors (not our code). Render parsed the blueprint and deployed clean. Singapore is closest region — no Sydney yet (planned later 2026). |
+| 2026-06-26 | Full monorepo committed & pushed to GitHub | Human | Entire codebase had been uncommitted / local-only for weeks — one laptop failure from total loss. Now backed up. New rule: commit per task; agents commit at the end of every task. |
+| 2026-06-26 | AI service stays stateless; Singapore hosting accepted | Claude + Human | Customer data lives in Supabase (Sydney); AI service is pure orchestration. Real residency lever is LLM inference (US) → AWS Bedrock ap-southeast-2 is the long-term move, not container region. |
 
 ---
 
@@ -352,4 +355,4 @@ Phases 2 and 3 run in parallel intentionally — independent workstreams.
 
 ---
 
-*Atlas AI · Plan v1.0 · May 2026 · Living Document — update as you go*
+*Atlas AI · Plan v1.1 · Updated 2026-06-26 · Living Document — update as you go*
