@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: atlas-ai-service
+    runtime: docker
+    region: singapore
+    branch: main
+    rootDir: apps/ai-service
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: AI_SERVICE_SHARED_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
