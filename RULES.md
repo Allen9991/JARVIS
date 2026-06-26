@@ -534,4 +534,57 @@ A task is **done** when all of the following are true. Not most. All.
 
 ---
 
+## 14. tRPC + Multi-Tenancy Conventions (established 2026-06-26)
+
+### 14.1 Every tenant-scoped procedure calls requireOrgMember
+
+Any tRPC procedure that reads or writes tenant data MUST call `ctx.requireOrgMember(orgId)` before accessing the database. No exceptions. The middleware throws `FORBIDDEN` if the user is not an accepted member of the target org.
+
+```ts
+// WRONG — data access without membership check
+.query(async ({ ctx, input }) => {
+  return ctx.db.select().from(jobs).where(eq(jobs.orgId, input.orgId));
+})
+
+// RIGHT
+.query(async ({ ctx, input }) => {
+  await ctx.requireOrgMember(input.orgId);
+  return ctx.db.select().from(jobs).where(eq(jobs.orgId, input.orgId));
+})
+```
+
+Procedures that CREATE a new org (where the user has no membership yet) are the only exception — they are protected by `protectedProcedure` only.
+
+### 14.2 Standard audit_log write pattern
+
+Every state-changing procedure that touches tenant data writes an audit_log entry in the same transaction. Pattern:
+
+```ts
+await tx.insert(auditLog).values({
+  orgId: ...,
+  userId: ctx.auth.uid,
+  action: 'router.procedureName',          // e.g. 'org.create'
+  entityType: 'table_name',                // snake_case table name
+  entityId: ...,                           // UUID of the primary entity affected
+  detailsJson: { /* relevant fields */ },
+});
+```
+
+The audit_log INSERT must be in the same Drizzle transaction as the primary write. Never write the audit record outside the transaction — if the primary write fails, no audit record should exist.
+
+### 14.3 Drizzle operators come from @atlas/db
+
+All Drizzle query operators (`eq`, `and`, `isNull`, `isNotNull`, etc.) are imported from `@atlas/db`, not directly from `drizzle-orm`. The `@atlas/db` package is the single gateway for all database-related imports.
+
+```ts
+// WRONG
+import { eq, and } from 'drizzle-orm';
+import { organisations } from '@atlas/db';
+
+// RIGHT
+import { and, eq, organisations } from '@atlas/db';
+```
+
+---
+
 *Atlas AI · Engineering Rules v1.0 · May 2026 · These rules do not expire.*

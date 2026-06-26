@@ -83,13 +83,17 @@
 **Owner: Codex (tRPC setup) + Claude Code (org membership logic)**
 
 - [x] tRPC v11 initialised with type-safe context
-- [ ] Context includes: `auth.uid()`, resolved `org_id`, Drizzle DB client
-- [~] `requireOrgMember(orgId)` helper implemented — stub exists, hardcoded OWNER; real DB membership check is the next task
+- [x] Context includes: `auth.uid()`, resolved `org_id`, Drizzle DB client
+- [x] `requireOrgMember(orgId)` helper implemented — real DB check, returns actual role, rejects non-members with FORBIDDEN; tests pass
 - [x] `protectedProcedure` base procedure that enforces auth
-- [ ] Organisation creation procedure: `org.create`
-- [ ] Organisation invite procedure: `org.invite` — sends email via Resend, creates pending membership
-- [ ] Accept invite procedure: `org.acceptInvite`
+- [x] Organisation creation procedure: `org.create`
+- [x] Organisation invite procedure: `org.invite` — creates pending membership (email via Resend not yet wired — TODO hook is in code; `RESEND_API_KEY` still pending)
+- [x] Accept invite procedure: `org.acceptInvite`
 - [ ] Every tRPC procedure that touches tenant data calls `requireOrgMember` — CI grep enforces this
+
+  Note: org create/invite UI is built against `apps/web/lib/org-api-mock.ts`
+  with validation, loading, success, and error states. It is not wired to the
+  real tRPC procedures yet.
 
 **Acceptance:** User A in Org A cannot call any `org.` procedure that returns Org B's data. CI grep for procedures missing `requireOrgMember` returns zero.
 
@@ -344,6 +348,8 @@ Phases 2 and 3 run in parallel intentionally — independent workstreams.
 | 2026-06-26 | Abandoned Railway, migrated AI service to Render (Singapore) | Claude Code + Human | 6 Railway deploys failed on builder-infra snapshot errors (not our code). Render parsed the blueprint and deployed clean. Singapore is closest region — no Sydney yet (planned later 2026). |
 | 2026-06-26 | Full monorepo committed & pushed to GitHub | Human | Entire codebase had been uncommitted / local-only for weeks — one laptop failure from total loss. Now backed up. New rule: commit per task; agents commit at the end of every task. |
 | 2026-06-26 | AI service stays stateless; Singapore hosting accepted | Claude + Human | Customer data lives in Supabase (Sydney); AI service is pure orchestration. Real residency lever is LLM inference (US) → AWS Bedrock ap-southeast-2 is the long-term move, not container region. |
+| 2026-06-26 | requireOrgMember uses Drizzle (service-role postgres) not user-session client | Claude Code | No authenticated write policies on org_memberships (migration is explicit). Using service-role Drizzle with explicit user_id+org_id+accepted_at IS NOT NULL filter is equally secure (userId comes from Supabase-validated JWT) and avoids a second Supabase admin client. |
+| 2026-06-26 | org.invite: existing users only (no pending-by-email invites) | Claude Code | Schema FK enforces it (user_id → users.id). Resend email is out of scope for Phase 0. Simpler path: inviter must tell the invitee to sign up first. Tradeoff: can't invite unknown users, accepted for Phase 0 — re-evaluate when Resend is wired. |
 
 ---
 
